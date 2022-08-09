@@ -73,11 +73,10 @@ class PID_ControllerClass(object):
             Update PID controller
             u(t) = K_p e(t) + K_i int e(t) {dt} + K_d {de}/{dt}
         """
-        self.cnt = self.cnt + 1
-        if t_curr is not None:
-            self.t_curr  = t_curr
         if x_trgt is not None:
             self.x_trgt  = x_trgt
+        if t_curr is not None:
+            self.t_curr  = t_curr
         if x_curr is not None:
             self.x_curr  = x_curr
             # PID controller updates here
@@ -115,10 +114,12 @@ class PID_ControllerClass(object):
                     print (" d_term:   %s"%(self.d_term))
                     print (" out_val:  %s"%(self.out_val))
                     print (" err_out:  %s"%(self.err_out))
-            
             # Backup
             self.t_prev   = self.t_curr
             self.err_prev = self.err_curr
+        # Counter
+        if (t_curr is not None) and (x_curr is not None):
+            self.cnt = self.cnt + 1
             
     def out(self):
         """

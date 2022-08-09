@@ -18,6 +18,8 @@ class MuJoCoManipulatorParserClass():
         self.VERBOSE  = VERBOSE
         self.tick     = 0
         self.t_init   = time.time()
+        self.max_sec  = np.inf
+        self.max_tick = np.inf
         # Parse basic info
         self._parse()
         
@@ -84,11 +86,23 @@ class MuJoCoManipulatorParserClass():
         """
         glfw.terminate()
 
-    def _update(self):
+    def set_max_sec(self,max_sec=10.0):
+        """
+            Set maximum second
+        """
+        self.max_sec  = max_sec
+        self.max_tick = int(self.max_sec*self.HZ)+1
+
+    def IS_ALIVE(self):
+        """
+            Is alive
+        """
+        return (self.tick < self.max_tick)
+
+    def update(self):
         """
             Update
         """
-        self.tick      = self.tick + 1
         self.sim_state = self.sim.get_state()
         self.q_curr    = self.sim_state.qpos[self.rev_joint_idxs]
         self.sec_sim   = self.sim_state.time
@@ -114,11 +128,11 @@ class MuJoCoManipulatorParserClass():
         """
         # Action
         if torque is not None:
-            self.sim.data.ctrl[self.rev_joint_idxs] = torque
-        # Update state first
-        self._update()
+            self.sim.data.ctrl[self.rev_joint_idxs] = np.copy(torque)
         # And then make a step
         self.sim.step()
+        # Counter
+        self.tick = self.tick + 1
 
     def render(self,render_speedup=1.0):
         """
@@ -133,6 +147,17 @@ class MuJoCoManipulatorParserClass():
         """
         self.step(torque=torque)
         self.render(render_speedup=render_speedup)
+
+    def add_marker(self,pos,radius=0.02,color=np.array([0.0,1.0,0.0,1.0]),label=None):
+        """
+            Add a maker to renderer
+        """
+        self.viewer.add_marker(
+            pos   = pos,
+            type  = 2, # mjtGeom: 2:sphere, 3:capsule, 6:box, 9:arrow
+            size  = radius*np.ones(3),
+            rgba  = color,
+            label = label)
         
     def reset(self):
         """
@@ -141,7 +166,7 @@ class MuJoCoManipulatorParserClass():
         # Reset simulation
         self.sim.reset()
         # Update once
-        self._update()
+        self.update()
         # Reset tick and timer
         self.tick    = 0
         self.t_init  = time.time()
