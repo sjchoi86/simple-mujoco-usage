@@ -82,7 +82,7 @@ class MuJoCoManipulatorParserClass():
         """
             Terminate viewer
         """
-        
+        glfw.terminate()
 
     def _update(self):
         """
@@ -108,10 +108,13 @@ class MuJoCoManipulatorParserClass():
             self.J_R_EE    = None
             self.J_full_EE = None
 
-    def step(self):
+    def step(self,torque=None):
         """
             Step
         """
+        # Action
+        if torque is not None:
+            self.sim.data.ctrl[self.rev_joint_idxs] = torque
         # Update state first
         self._update()
         # And then make a step
@@ -124,11 +127,11 @@ class MuJoCoManipulatorParserClass():
         if (self.sec_sim >= render_speedup*self.sec_wall):
             self.viewer.render()
 
-    def step_and_render(self,render_speedup=1.0):
+    def step_and_render(self,torque=None,render_speedup=1.0):
         """
             Step and Render
         """
-        self.step()
+        self.step(torque=torque)
         self.render(render_speedup=render_speedup)
         
     def reset(self):

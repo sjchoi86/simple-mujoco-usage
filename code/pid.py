@@ -104,7 +104,7 @@ class PID_ControllerClass(object):
                 self.out_val_prev = self.out_val
 
                 if VERBOSE:
-                    print ("[%d] t_curr:[%.2f] dt:[%.2f]"%
+                    print ("cnt:[%d] t_curr:[%.5f] dt:[%.5f]"%
                            (self.cnt,self.t_curr,self.dt))
                     print (" x_trgt:   %s"%(self.x_trgt))
                     print (" x_curr:   %s"%(self.x_curr))
