@@ -38,8 +38,6 @@ class MuJoCoManipulatorParserClass():
         self.xml_path        = os.path.join(cwd,self.rel_path)
         self.mj_model        = mujoco_py.load_model_from_path(self.xml_path)
         self.sim             = mujoco_py.MjSim(self.mj_model)
-        if self.VERBOSE:
-            print ("[%s] parsed."%(self.xml_path))
         # Parse
         self.dt              = self.sim.model.opt.timestep
         self.HZ              = int(1/self.dt)
@@ -56,22 +54,25 @@ class MuJoCoManipulatorParserClass():
         self.joint_range     = self.sim.model.jnt_range
         self.torque_range    = self.sim.model.actuator_ctrlrange
         if self.VERBOSE:
+            print ("[%s] parsed."%(self.xml_path))
+            print ("")
             print ("dt:[%.3f] HZ:[%d]"%(self.dt,self.HZ))
-            print ("body_names:\n%s"%(self.body_names))
-            print ("ee_name         :%s"%(self.ee_name))
+            print ("body_names:\n %s"%(self.body_names))
+            print ("ee_name: [%s]"%(self.ee_name))
             print ("")
-            print ("n_joint         : [%d]"%(self.n_joint))
-            print ("joint_names     : %s"%(self.joint_names))
-            print ("joint_types     : %s"%(self.joint_types))
-            print ("n_rev_joint     : [%d]"%(self.n_rev_joint))
-            print ("rev_joint_idxs  : %s"%(self.rev_joint_idxs))
-            print ("rev_joint_names : %s"%(self.rev_joint_names))
-            print ("pri_joint_idxs  : %s"%(self.pri_joint_idxs))
-            print ("pri_joint_names : %s"%(self.pri_joint_names))
+            print ("n_joint: [%d]"%(self.n_joint))
+            print ("joint_names:\n %s"%(self.joint_names))
+            print ("joint_types:\n %s"%(self.joint_types))
+            print (" (0:free, 1:ball, 2:slide, 3:hinge) ")
+            print ("n_rev_joint: [%d]"%(self.n_rev_joint))
+            print ("rev_joint_idxs:\n %s"%(self.rev_joint_idxs))
+            print ("rev_joint_names:\n %s"%(self.rev_joint_names))
+            print ("pri_joint_idxs:\n %s"%(self.pri_joint_idxs))
+            print ("pri_joint_names:\n %s"%(self.pri_joint_names))
             print ("")
-            print ("joint_range:\n%s"%(self.joint_range))
-            print ("torque_range:\n%s"%(self.torque_range))
-            print ("torque_range:\n%s"%(self.torque_range))
+            print ("joint_range:\n %s"%(self.joint_range))
+            print ("torque_range:\n %s"%(self.torque_range))
+            print ("torque_range:\n %s"%(self.torque_range))
         # Save initial q
         self.q_init = self.get_q_rev()
 

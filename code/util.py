@@ -93,3 +93,32 @@ def get_colors(n,cm=plt.cm.rainbow):
     """
     colors = cm(np.linspace(0.0,1.0,n))
     return colors
+
+def soft_squash(x,x_min=-1,x_max=+1,margin=0.1):
+    """
+        Soft squashing numpy array
+    """
+    def th(z,m=0.0):
+        # thresholding function 
+        return (m)*(np.exp(2/m*z)-1)/(np.exp(2/m*z)+1)
+    x_in = np.copy(x)
+    idxs_upper = np.where(x_in>(x_max-margin))
+    x_in[idxs_upper] = th(x_in[idxs_upper]-(x_max-margin),m=margin) + (x_max-margin)
+    idxs_lower = np.where(x_in<(x_min+margin))
+    x_in[idxs_lower] = th(x_in[idxs_lower]-(x_min+margin),m=margin) + (x_min+margin)
+    return x_in    
+
+def soft_squash_multidim(
+    x      = np.random.randn(100,5),
+    x_min  = -np.ones(5),
+    x_max  = np.ones(5),
+    margin = 0.1):
+    """
+        Multi-dim version of 'soft_squash' function
+    """
+    x_squash = np.copy(x)
+    dim      = x.shape[1]
+    for d_idx in range(dim):
+        x_squash[:,d_idx] = soft_squash(
+            x=x[:,d_idx],x_min=x_min[d_idx],x_max=x_max[d_idx],margin=margin)
+    return x_squash
