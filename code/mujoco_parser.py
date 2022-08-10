@@ -21,8 +21,14 @@ class MuJoCoManipulatorParserClass():
         self.t_init   = time.time()
         self.max_sec  = np.inf
         self.max_tick = np.inf
+        self.SIM_MODE = 'Idle' # Idle / Dynamics / Kinematics
         # Parse basic info
         self._parse()
+        # Terminate viewer
+        self.terminate_viewer()
+        glfw.init()
+        # Reset 
+        self.reset()
         
     def _parse(self):
         """
@@ -66,6 +72,8 @@ class MuJoCoManipulatorParserClass():
             print ("joint_range:\n%s"%(self.joint_range))
             print ("torque_range:\n%s"%(self.torque_range))
             print ("torque_range:\n%s"%(self.torque_range))
+        # Save initial q
+        self.q_init = self.get_q_rev()
 
     def init_viewer(self,TERMINATE_GLFW=True,window_width=0.5,window_height=0.5):
         """
@@ -94,6 +102,13 @@ class MuJoCoManipulatorParserClass():
         self.max_sec  = max_sec
         self.max_tick = int(self.max_sec*self.HZ)+1
 
+    def set_max_tick(self,max_tick=1000):
+        """
+            Set maximum tick
+        """
+        self.max_tick = max_tick + 1
+        self.max_sec  = self.max_tick*self.dt
+
     def plot_scene(
         self,figsize=(12,8),render_w=1200,render_h=800,title_str=None,title_fs=11):
         """
@@ -121,6 +136,8 @@ class MuJoCoManipulatorParserClass():
         """
         self.sim_state = self.sim.get_state()
         self.sec_sim   = self.sim_state.time
+        if self.SIM_MODE=='Kinematics':
+            self.sec_sim = self.tick*self.dt # forward() does not increase 'sim_state.time'
         return self.sec_sim
 
     def get_sec_wall(self):
@@ -164,8 +181,10 @@ class MuJoCoManipulatorParserClass():
 
     def step(self,torque=None):
         """
-            Step
+            Forward dynamics
         """
+        # Set mode
+        self.SIM_MODE = 'Dynamics' # Idle / Dynamics / Kinematics
         # Action
         if torque is not None:
             self.sim.data.ctrl[self.rev_joint_idxs] = np.copy(torque)
@@ -174,28 +193,39 @@ class MuJoCoManipulatorParserClass():
         # Counter
         self.tick = self.tick + 1
 
-    def forward(self):
+    def forward(self,q_rev=None):
         """
             Forward kinematics
         """
+        # Set mode
+        self.SIM_MODE = 'Kinematics' # Idle / Dynamics / Kinematics
         # Forward kinematics
+        if q_rev is not None:
+            self.sim.data.qpos[self.rev_joint_idxs] = q_rev
         self.sim.forward()
         # Counter
         self.tick = self.tick + 1
 
-    def render(self,render_speedup=1.0):
+    def render(self,render_speedup=1.0,RENDER_ALWAYS=False):
         """
             Render
         """
-        if (self.get_sec_sim() >= render_speedup*self.get_sec_wall()):
+        if (self.get_sec_sim() >= render_speedup*self.get_sec_wall()) or RENDER_ALWAYS:
             self.viewer.render()
 
-    def step_and_render(self,torque=None,render_speedup=1.0):
+    def step_and_render(self,torque=None,render_speedup=1.0,RENDER_ALWAYS=False):
         """
             Step and Render
         """
         self.step(torque=torque)
-        self.render(render_speedup=render_speedup)
+        self.render(render_speedup=render_speedup,RENDER_ALWAYS=RENDER_ALWAYS)
+
+    def forward_and_render(self,q_rev=None,render_speedup=1.0,RENDER_ALWAYS=False):
+        """
+            FK and Render
+        """
+        self.forward(q_rev=q_rev)
+        self.render(render_speedup=render_speedup,RENDER_ALWAYS=RENDER_ALWAYS)
 
     def add_marker(self,pos,radius=0.02,color=np.array([0.0,1.0,0.0,1.0]),label=None):
         """
@@ -214,6 +244,8 @@ class MuJoCoManipulatorParserClass():
         """
         # Reset simulation
         self.sim.reset()
+        # Revert to the initial position
+        self.forward(q_rev=self.q_init)
         # Reset tick and timer
         self.tick    = 0
         self.t_init  = time.time()
@@ -224,6 +256,6 @@ class MuJoCoManipulatorParserClass():
         """
         if (((self.tick-1)%int(print_every_sec*self.HZ))==0):
             if (VERBOSE>=1):
-                print ("tick:[%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
-                (self.tick,self.get_sec_wall(),self.get_sec_sim()))
+                print ("tick:[%d/%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
+                (self.tick,self.max_tick,self.get_sec_wall(),self.get_sec_sim()))
 
