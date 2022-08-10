@@ -1,5 +1,6 @@
-import os,mujoco_py,glfw,time
+import cv2,os,mujoco_py,glfw,time
 import numpy as np
+import matplotlib.pyplot as plt
 from screeninfo import get_monitors
 from util import pr2T
 
@@ -93,34 +94,73 @@ class MuJoCoManipulatorParserClass():
         self.max_sec  = max_sec
         self.max_tick = int(self.max_sec*self.HZ)+1
 
+    def plot_scene(
+        self,figsize=(12,8),render_w=1200,render_h=800,title_str=None,title_fs=11):
+        """
+            Plot current scnene
+        """
+        img = self.sim.render(width=render_w,height=render_h)
+        img = self.sim.render(width=render_w,height=render_h)
+        img = cv2.flip(cv2.rotate(img,cv2.ROTATE_180),1) # 0:up<->down, 1:left<->right
+
+        plt.figure(figsize=figsize)
+        plt.imshow(img)
+        if title_str is not None:
+            plt.title(title_str,fontsize=title_fs)
+        plt.show()
+
     def IS_ALIVE(self):
         """
             Is alive
         """
         return (self.tick < self.max_tick)
 
-    def update(self):
+    def get_sec_sim(self):
         """
-            Update
+            Get simulation time
         """
         self.sim_state = self.sim.get_state()
-        self.q_curr    = self.sim_state.qpos[self.rev_joint_idxs]
         self.sec_sim   = self.sim_state.time
-        self.sec_wall  = time.time() - self.t_init
-        if self.ee_name is not None:
-            self.p_EE_curr = np.array(self.sim.data.body_xpos[self.sim.model.body_name2id(self.ee_name)])
-            self.R_EE_curr = np.array(self.sim.data.body_xmat[self.sim.model.body_name2id(self.ee_name)].reshape([3, 3]))
-            self.T_EE_curr = pr2T(p=self.p_EE_curr,R=self.R_EE_curr)
-            self.J_p_EE    = np.array(self.sim.data.get_body_jacp(self.ee_name).reshape((3, -1))[:,self.rev_qvel_idxs])
-            self.J_R_EE    = np.array(self.sim.data.get_body_jacr(self.ee_name).reshape((3, -1))[:,self.rev_qvel_idxs])
-            self.J_full_EE = np.array(np.vstack([self.J_p_EE,self.J_R_EE]))
-        else:
-            self.p_EE_curr = None
-            self.R_EE_curr = None
-            self.T_EE_curr = None
-            self.J_p_EE    = None
-            self.J_R_EE    = None
-            self.J_full_EE = None
+        return self.sec_sim
+
+    def get_sec_wall(self):
+        """
+            Get wall-clock time
+        """
+        self.sec_wall = time.time() - self.t_init
+        return self.sec_wall
+
+    def get_q_rev(self):
+        """
+            Get current revolute joint position
+        """
+        self.sim_state = self.sim.get_state()
+        self.q_rev = self.sim_state.qpos[self.rev_joint_idxs]
+        return self.q_rev
+
+    def get_p_body(self,body_name):
+        """
+            Get body position
+        """
+        self.sim_state = self.sim.get_state()
+        p = np.array(self.sim.data.body_xpos[self.sim.model.body_name2id(body_name)])
+        return p
+
+    def get_R_body(self,body_name):
+        """
+            Get body rotation
+        """
+        R = np.array(self.sim.data.body_xmat[self.sim.model.body_name2id(self.ee_name)].reshape([3, 3]))
+        return R
+
+    def get_J_body(self,body_name):
+        """
+            Get body Jacobian
+        """
+        J_p    = np.array(self.sim.data.get_body_jacp(body_name).reshape((3, -1))[:,self.rev_qvel_idxs])
+        J_R    = np.array(self.sim.data.get_body_jacr(body_name).reshape((3, -1))[:,self.rev_qvel_idxs])
+        J_full = np.array(np.vstack([J_p,J_R]))
+        return J_p,J_R,J_full
 
     def step(self,torque=None):
         """
@@ -134,11 +174,20 @@ class MuJoCoManipulatorParserClass():
         # Counter
         self.tick = self.tick + 1
 
+    def forward(self):
+        """
+            Forward kinematics
+        """
+        # Forward kinematics
+        self.sim.forward()
+        # Counter
+        self.tick = self.tick + 1
+
     def render(self,render_speedup=1.0):
         """
             Render
         """
-        if (self.sec_sim >= render_speedup*self.sec_wall):
+        if (self.get_sec_sim() >= render_speedup*self.get_sec_wall()):
             self.viewer.render()
 
     def step_and_render(self,torque=None,render_speedup=1.0):
@@ -165,8 +214,6 @@ class MuJoCoManipulatorParserClass():
         """
         # Reset simulation
         self.sim.reset()
-        # Update once
-        self.update()
         # Reset tick and timer
         self.tick    = 0
         self.t_init  = time.time()
@@ -178,5 +225,5 @@ class MuJoCoManipulatorParserClass():
         if (((self.tick-1)%int(print_every_sec*self.HZ))==0):
             if (VERBOSE>=1):
                 print ("tick:[%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
-                (self.tick,self.sec_wall,self.sec_sim))
+                (self.tick,self.get_sec_wall(),self.get_sec_sim()))
 
