@@ -2,7 +2,7 @@ import cv2,os,mujoco_py,glfw,time
 import numpy as np
 import matplotlib.pyplot as plt
 from screeninfo import get_monitors
-from util import pr2T
+from util import r2w,trim_scale
 
 class MuJoCoManipulatorParserClass():
     def __init__(self,
@@ -259,3 +259,27 @@ class MuJoCoManipulatorParserClass():
                 print ("tick:[%d/%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
                 (self.tick,self.max_tick,self.get_sec_wall(),self.get_sec_sim()))
 
+    def one_step_ik(self,body_name,p_trgt=None,R_trgt=None,th=1.0*np.pi/180.0):
+        """
+            One-step inverse kinematics
+        """
+        J_p,J_R,J_full = self.get_J_body(body_name=body_name)
+        p_curr = self.get_p_body(body_name=body_name)
+        R_curr = self.get_R_body(body_name=body_name)
+        if (p_trgt is not None) and (R_trgt is not None): # both p and R targets are given
+            p_err = (p_trgt-p_curr)
+            R_err = np.linalg.solve(R_curr,R_trgt)
+            w_err = R_curr @ r2w(R_err)
+            J,err = J_full,np.concatenate((p_err,w_err))
+        elif (p_trgt is not None) and (R_trgt is None): # only p target is given
+            p_err = (p_trgt-p_curr)
+            J,err = J_p,p_err
+        elif (p_trgt is None) and (R_trgt is not None): # only R target is given
+            R_err = np.linalg.solve(R_curr,R_trgt)
+            w_err = R_curr @ r2w(R_err)
+            J,err = J_R,w_err
+        else:
+            raise Exception('At least one IK target is required!')
+        dq = np.linalg.solve(a=(J.T@J)+1e-6*np.eye(J.shape[1]),b=J.T@err)
+        dq = trim_scale(x=dq,th=th)
+        return dq,err
