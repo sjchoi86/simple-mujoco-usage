@@ -75,7 +75,8 @@ class MuJoCoManipulatorParserClass():
         # Save initial q
         self.q_init = self.get_q_rev()
 
-    def init_viewer(self,TERMINATE_GLFW=True,window_width=0.5,window_height=0.5,cam_distance=None):
+    def init_viewer(self,TERMINATE_GLFW=True,window_width=0.5,window_height=0.5,
+                    cam_distance=None,cam_elevation=None,cam_lookat=None):
         """
             Init viewer
         """
@@ -91,6 +92,12 @@ class MuJoCoManipulatorParserClass():
         # Viewer setting
         if cam_distance is not None:
             self.viewer.cam.distance = cam_distance
+        if cam_elevation is not None:
+            self.viewer.cam.elevation = cam_elevation
+        if cam_lookat is not None:
+            self.viewer.cam.lookat[0] = cam_lookat[0]
+            self.viewer.cam.lookat[1] = cam_lookat[1]
+            self.viewer.cam.lookat[2] = cam_lookat[2]
     
     def terminate_viewer(self):
         """
@@ -113,17 +120,25 @@ class MuJoCoManipulatorParserClass():
         self.max_sec  = self.max_tick*self.dt
 
     def plot_scene(self,figsize=(12,8),render_w=1200,render_h=800,title_str=None,title_fs=11,
-                   cam_distance=None,cam_elevation=None,NO_PLOT=False):
+                   cam_distance=None,cam_elevation=None,cam_lookat=None,NO_PLOT=False):
         """
             Plot current scnene
         """
         if cam_distance is not None:
-            self.sim.render_contexts[0].cam.distance  = cam_distance
+            for r_idx in range(len(self.sim.render_contexts)):
+                self.sim.render_contexts[r_idx].cam.distance  = cam_distance
         if cam_elevation is not None:
-            self.sim.render_contexts[0].cam.elevation = cam_elevation
+            for r_idx in range(len(self.sim.render_contexts)):
+                self.sim.render_contexts[r_idx].cam.elevation = cam_elevation
+        if cam_lookat is not None:
+            for r_idx in range(len(self.sim.render_contexts)):
+                self.sim.render_contexts[r_idx].cam.lookat[0] = cam_lookat[0]
+                self.sim.render_contexts[r_idx].cam.lookat[1] = cam_lookat[1]
+                self.sim.render_contexts[r_idx].cam.lookat[2] = cam_lookat[2]
 
-        img = self.sim.render(width=render_w,height=render_h)
-        img = self.sim.render(width=render_w,height=render_h)
+        for _ in range(5):
+            img = self.sim.render(width=render_w,height=render_h)
+
         img = cv2.flip(cv2.rotate(img,cv2.ROTATE_180),1) # 0:up<->down, 1:left<->right
         if NO_PLOT:
             return img
@@ -224,6 +239,7 @@ class MuJoCoManipulatorParserClass():
             self.viewer._render_every_frame = True
         else:
             self.viewer._render_every_frame = False
+
         if (self.get_sec_sim() >= render_speedup*self.get_sec_wall()) or RENDER_ALWAYS:
             self.viewer.render()
 
