@@ -1,6 +1,7 @@
 
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 
 def pr2T(p,R):
     """ 
@@ -85,3 +86,10 @@ def trim_scale(x,th):
     if x_abs_max > th:
         x = x*th/x_abs_max
     return x
+
+def get_colors(n,cm=plt.cm.rainbow):
+    """
+        Get different colors
+    """
+    colors = cm(np.linspace(0.0,1.0,n))
+    return colors
