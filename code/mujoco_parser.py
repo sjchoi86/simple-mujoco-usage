@@ -15,7 +15,7 @@ class MuJoCoManipulatorParserClass():
         """
         self.name     = name
         self.rel_path = rel_path
-        self.ee_name  = 'panda_eef'
+        self.ee_name  = ee_name
         self.VERBOSE  = VERBOSE
         self.tick     = 0
         self.t_init   = time.time()
@@ -75,7 +75,7 @@ class MuJoCoManipulatorParserClass():
         # Save initial q
         self.q_init = self.get_q_rev()
 
-    def init_viewer(self,TERMINATE_GLFW=True,window_width=0.5,window_height=0.5):
+    def init_viewer(self,TERMINATE_GLFW=True,window_width=0.5,window_height=0.5,cam_distance=None):
         """
             Init viewer
         """
@@ -88,6 +88,9 @@ class MuJoCoManipulatorParserClass():
             window = self.viewer.window,
             width  = int(window_width*get_monitors()[0].width),
             height = int(window_height*get_monitors()[0].height))
+        # Viewer setting
+        if cam_distance is not None:
+            self.viewer.cam.distance = cam_distance
     
     def terminate_viewer(self):
         """
@@ -109,20 +112,27 @@ class MuJoCoManipulatorParserClass():
         self.max_tick = max_tick + 1
         self.max_sec  = self.max_tick*self.dt
 
-    def plot_scene(
-        self,figsize=(12,8),render_w=1200,render_h=800,title_str=None,title_fs=11):
+    def plot_scene(self,figsize=(12,8),render_w=1200,render_h=800,title_str=None,title_fs=11,
+                   cam_distance=None,cam_elevation=None,NO_PLOT=False):
         """
             Plot current scnene
         """
+        if cam_distance is not None:
+            self.sim.render_contexts[0].cam.distance  = cam_distance
+        if cam_elevation is not None:
+            self.sim.render_contexts[0].cam.elevation = cam_elevation
+
         img = self.sim.render(width=render_w,height=render_h)
         img = self.sim.render(width=render_w,height=render_h)
         img = cv2.flip(cv2.rotate(img,cv2.ROTATE_180),1) # 0:up<->down, 1:left<->right
-
-        plt.figure(figsize=figsize)
-        plt.imshow(img)
-        if title_str is not None:
-            plt.title(title_str,fontsize=title_fs)
-        plt.show()
+        if NO_PLOT:
+            return img
+        else:
+            plt.figure(figsize=figsize)
+            plt.imshow(img)
+            if title_str is not None:
+                plt.title(title_str,fontsize=title_fs)
+            plt.show()
 
     def IS_ALIVE(self):
         """
@@ -210,6 +220,10 @@ class MuJoCoManipulatorParserClass():
         """
             Render
         """
+        if RENDER_ALWAYS:
+            self.viewer._render_every_frame = True
+        else:
+            self.viewer._render_every_frame = False
         if (self.get_sec_sim() >= render_speedup*self.get_sec_wall()) or RENDER_ALWAYS:
             self.viewer.render()
 
@@ -250,14 +264,20 @@ class MuJoCoManipulatorParserClass():
         self.tick    = 0
         self.t_init  = time.time()
 
-    def print(self,print_every_sec=1.0,VERBOSE=1):
+    def print(self,print_every_sec=None,print_every_tick=None,VERBOSE=1):
         """
             Print
         """
-        if (((self.tick-1)%int(print_every_sec*self.HZ))==0):
-            if (VERBOSE>=1):
-                print ("tick:[%d/%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
-                (self.tick,self.max_tick,self.get_sec_wall(),self.get_sec_sim()))
+        if print_every_sec is not None:
+            if (((self.tick-1)%int(print_every_sec*self.HZ))==0):
+                if (VERBOSE>=1):
+                    print ("tick:[%d/%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
+                    (self.tick,self.max_tick,self.get_sec_wall(),self.get_sec_sim()))
+        if print_every_tick is not None:
+            if (((self.tick-1)%print_every_tick)==0):
+                if (VERBOSE>=1):
+                    print ("tick:[%d/%d], sec_wall:[%.3f]sec, sec_sim:[%.3f]sec"%
+                    (self.tick,self.max_tick,self.get_sec_wall(),self.get_sec_sim()))
 
     def one_step_ik(self,body_name,p_trgt=None,R_trgt=None,th=1.0*np.pi/180.0):
         """
