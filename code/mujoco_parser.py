@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from screeninfo import get_monitors
 from util import r2w,trim_scale
 
-class MuJoCoManipulatorParserClass():
+class MuJoCoParserClass():
     def __init__(self,
                  name     = 'Robot',
                  rel_path = '../asset/panda/franka_panda.xml',
