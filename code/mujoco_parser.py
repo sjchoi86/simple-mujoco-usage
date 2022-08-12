@@ -20,7 +20,7 @@ class MuJoCoParserClass():
         self.tick     = 0
         self.t_init   = time.time()
         self.max_sec  = np.inf
-        self.max_tick = np.inf
+        self.max_tick = 50000
         self.SIM_MODE = 'Idle' # Idle / Dynamics / Kinematics
         # Parse basic info
         self._parse()
@@ -53,6 +53,7 @@ class MuJoCoParserClass():
         self.pri_joint_names = [self.joint_names[x] for x in self.pri_joint_idxs]
         self.joint_range     = self.sim.model.jnt_range
         self.torque_range    = self.sim.model.actuator_ctrlrange
+        self.n_torque        = self.torque_range.shape[0]
         if self.VERBOSE:
             print ("[%s] parsed."%(self.xml_path))
             print ("")
@@ -72,7 +73,8 @@ class MuJoCoParserClass():
             print ("")
             print ("joint_range:\n %s"%(self.joint_range))
             print ("torque_range:\n %s"%(self.torque_range))
-            print ("torque_range:\n %s"%(self.torque_range))
+            print ("n_torque:[%d]"%(self.n_torque))
+
         # Save initial q
         self.q_init = self.get_q_rev()
 
@@ -125,19 +127,18 @@ class MuJoCoParserClass():
         """
             Plot current scnene
         """
-        if cam_distance is not None:
-            for r_idx in range(len(self.sim.render_contexts)):
-                self.sim.render_contexts[r_idx].cam.distance  = cam_distance
-        if cam_elevation is not None:
-            for r_idx in range(len(self.sim.render_contexts)):
-                self.sim.render_contexts[r_idx].cam.elevation = cam_elevation
-        if cam_lookat is not None:
-            for r_idx in range(len(self.sim.render_contexts)):
-                self.sim.render_contexts[r_idx].cam.lookat[0] = cam_lookat[0]
-                self.sim.render_contexts[r_idx].cam.lookat[1] = cam_lookat[1]
-                self.sim.render_contexts[r_idx].cam.lookat[2] = cam_lookat[2]
-
         for _ in range(5):
+            if cam_distance is not None:
+                for r_idx in range(len(self.sim.render_contexts)):
+                    self.sim.render_contexts[r_idx].cam.distance  = cam_distance
+            if cam_elevation is not None:
+                for r_idx in range(len(self.sim.render_contexts)):
+                    self.sim.render_contexts[r_idx].cam.elevation = cam_elevation
+            if cam_lookat is not None:
+                for r_idx in range(len(self.sim.render_contexts)):
+                    self.sim.render_contexts[r_idx].cam.lookat[0] = cam_lookat[0]
+                    self.sim.render_contexts[r_idx].cam.lookat[1] = cam_lookat[1]
+                    self.sim.render_contexts[r_idx].cam.lookat[2] = cam_lookat[2]
             img = self.sim.render(width=render_w,height=render_h)
 
         img = cv2.flip(cv2.rotate(img,cv2.ROTATE_180),1) # 0:up<->down, 1:left<->right
@@ -205,7 +206,7 @@ class MuJoCoParserClass():
         J_full = np.array(np.vstack([J_p,J_R]))
         return J_p,J_R,J_full
 
-    def step(self,torque=None):
+    def step(self,torque=None,TORQUE_TO_REV_JOINT=True):
         """
             Forward dynamics
         """
@@ -213,7 +214,10 @@ class MuJoCoParserClass():
         self.SIM_MODE = 'Dynamics' # Idle / Dynamics / Kinematics
         # Action
         if torque is not None:
-            self.sim.data.ctrl[self.rev_joint_idxs] = np.copy(torque)
+            if TORQUE_TO_REV_JOINT:
+                self.sim.data.ctrl[self.rev_joint_idxs] = np.copy(torque)
+            else:
+                self.sim.data.ctrl[:] = np.copy(torque)
         # And then make a step
         self.sim.step()
         # Counter
@@ -244,11 +248,11 @@ class MuJoCoParserClass():
         if (self.get_sec_sim() >= render_speedup*self.get_sec_wall()) or RENDER_ALWAYS:
             self.viewer.render()
 
-    def step_and_render(self,torque=None,render_speedup=1.0,RENDER_ALWAYS=False):
+    def step_and_render(self,torque=None,TORQUE_TO_REV_JOINT=True,render_speedup=1.0,RENDER_ALWAYS=False):
         """
             Step and Render
         """
-        self.step(torque=torque)
+        self.step(torque=torque,TORQUE_TO_REV_JOINT=TORQUE_TO_REV_JOINT)
         self.render(render_speedup=render_speedup,RENDER_ALWAYS=RENDER_ALWAYS)
 
     def forward_and_render(self,q_rev=None,render_speedup=1.0,RENDER_ALWAYS=False):
@@ -320,3 +324,11 @@ class MuJoCoParserClass():
         dq = np.linalg.solve(a=(J.T@J)+1e-6*np.eye(J.shape[1]),b=J.T@err)
         dq = trim_scale(x=dq,th=th)
         return dq,err
+
+    def sleep(self,sec=0.0):
+        """
+            Sleep
+        """
+        if sec > 0.0:
+            time.sleep(sec)
+

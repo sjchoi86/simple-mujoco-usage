@@ -1,22 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
-from util import soft_squash_multidim
-
-def kernel_se(X1,X2,hyp={'g':1,'l':1}):
-    """
-        Squared exponential (SE) kernel function
-    """
-    K = hyp['g']*np.exp(-cdist(X1,X2,'sqeuclidean')/(2*hyp['l']*hyp['l']))
-    return K
-
-def kernel_levse(X1,X2,L1,L2,hyp={'g':1,'l':1}):
-    """
-        Leveraged SE kernel function
-    """
-    K = hyp['g']*np.exp(-cdist(X1,X2,'sqeuclidean')/(2*hyp['l']*hyp['l']))
-    L = np.cos(np.pi/2.0*cdist(L1,L2,'cityblock'))
-    return np.multiply(K,L)
+from util import soft_squash_multidim,kernel_levse,kernel_se
 
 class GaussianRandomPathClass(object):
     def __init__(self,
