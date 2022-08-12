@@ -6,27 +6,30 @@ from util import r2w,trim_scale
 
 class MuJoCoParserClass():
     def __init__(self,
-                 name     = 'Robot',
-                 rel_path = '../asset/panda/franka_panda.xml',
-                 ee_name  = 'panda_eef',
-                 VERBOSE  = False):
+                 name           = 'Robot',
+                 rel_path       = '../asset/panda/franka_panda.xml',
+                 ee_name        = 'panda_eef',
+                 MINIMAL_RENDER = False,
+                 VERBOSE        = False):
         """
             Init
         """
-        self.name     = name
-        self.rel_path = rel_path
-        self.ee_name  = ee_name
-        self.VERBOSE  = VERBOSE
-        self.tick     = 0
-        self.t_init   = time.time()
-        self.max_sec  = np.inf
-        self.max_tick = 50000
-        self.SIM_MODE = 'Idle' # Idle / Dynamics / Kinematics
+        self.name           = name
+        self.rel_path       = rel_path
+        self.ee_name        = ee_name
+        self.MINIMAL_RENDER = MINIMAL_RENDER
+        self.VERBOSE        = VERBOSE
+        self.tick           = 0
+        self.t_init         = time.time()
+        self.max_sec        = np.inf
+        self.max_tick       = 50000
+        self.SIM_MODE       = 'Idle' # Idle / Dynamics / Kinematics
         # Parse basic info
         self._parse()
         # Terminate viewer
         self.terminate_viewer()
-        glfw.init()
+        if self.MINIMAL_RENDER is not True:
+            glfw.init()
         # Reset 
         self.reset()
         
@@ -83,30 +86,33 @@ class MuJoCoParserClass():
         """
             Init viewer
         """
-        if TERMINATE_GLFW:
-            glfw.terminate()
-        glfw.init()
+        if self.MINIMAL_RENDER is not True:
+            if TERMINATE_GLFW:
+                glfw.terminate()
+            glfw.init()
         # Init viewer
         self.viewer = mujoco_py.MjViewer(self.sim)
-        glfw.set_window_size(
-            window = self.viewer.window,
-            width  = int(window_width*get_monitors()[0].width),
-            height = int(window_height*get_monitors()[0].height))
-        # Viewer setting
-        if cam_distance is not None:
-            self.viewer.cam.distance = cam_distance
-        if cam_elevation is not None:
-            self.viewer.cam.elevation = cam_elevation
-        if cam_lookat is not None:
-            self.viewer.cam.lookat[0] = cam_lookat[0]
-            self.viewer.cam.lookat[1] = cam_lookat[1]
-            self.viewer.cam.lookat[2] = cam_lookat[2]
+        if self.MINIMAL_RENDER is not True:
+            glfw.set_window_size(
+                window = self.viewer.window,
+                width  = int(window_width*get_monitors()[0].width),
+                height = int(window_height*get_monitors()[0].height))
+            # Viewer setting
+            if cam_distance is not None:
+                self.viewer.cam.distance = cam_distance
+            if cam_elevation is not None:
+                self.viewer.cam.elevation = cam_elevation
+            if cam_lookat is not None:
+                self.viewer.cam.lookat[0] = cam_lookat[0]
+                self.viewer.cam.lookat[1] = cam_lookat[1]
+                self.viewer.cam.lookat[2] = cam_lookat[2]
     
     def terminate_viewer(self):
         """
             Terminate viewer
         """
-        glfw.terminate()
+        if self.MINIMAL_RENDER is not True:
+            glfw.terminate()
 
     def set_max_sec(self,max_sec=10.0):
         """
