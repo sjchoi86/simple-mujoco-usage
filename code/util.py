@@ -1,4 +1,4 @@
-import time,torch,math
+import time,torch,math,os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
@@ -483,4 +483,23 @@ def whitening_torch(x=torch.rand(5,2)):
     else:
         x_mean  = torch.mean(x,axis=0)
         x_std   = torch.std(x,axis=0)
-    return (x-x_mean)/x_std    
+    return (x-x_mean)/x_std
+
+def save_torch_wb(OBJ,folder_path='../weight',pth_name='wb.pth',VERBOSE=True):
+    """
+        Save torch weights and biases
+    """
+    os.makedirs(folder_path,exist_ok=True)
+    pth_path = os.path.join(folder_path,pth_name)
+    torch.save(obj=OBJ.state_dict(),f=pth_path)
+    if VERBOSE:
+        print ("[%s] saved."%(pth_path))
+
+def load_torch_wb(OBJ,folder_path='../weight',pth_name='wb.pth',VERBOSE=True):
+    """
+        Load torch weights and biases
+    """
+    pth_path = os.path.join(folder_path,pth_name)
+    OBJ.load_state_dict(torch.load(pth_path))
+    if VERBOSE:
+        print ("[%s] loaded."%(pth_path))
