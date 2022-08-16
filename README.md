@@ -12,4 +12,6 @@ for tick in range(1000):
 ```
 For those who have run the following code, you are already running `MuJoCo` under the hood. However, `MuJoCo` is not just some engine that simulates some robots. In this repository, we focus on the core functionalities of `MuJoCo` and how we can leverage such information in robot learning tasks through the lens of a Roboticist. 
 
+In particular, we will distinguish `kinematic` and `dynamic` simulations (e.g., forward/inverse kinematics/dynamcis).
+
 Contact: sungjoon-choi@korea.ac.kr 
