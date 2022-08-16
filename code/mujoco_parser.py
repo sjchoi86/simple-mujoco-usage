@@ -8,7 +8,6 @@ class MuJoCoParserClass():
     def __init__(self,
                  name           = 'Robot',
                  rel_path       = '../asset/panda/franka_panda.xml',
-                 ee_name        = 'panda_eef',
                  MINIMAL_RENDER = False,
                  VERBOSE        = False):
         """
@@ -16,7 +15,7 @@ class MuJoCoParserClass():
         """
         self.name           = name
         self.rel_path       = rel_path
-        self.ee_name        = ee_name
+    
         self.MINIMAL_RENDER = MINIMAL_RENDER
         self.VERBOSE        = VERBOSE
         self.tick           = 0
@@ -62,7 +61,6 @@ class MuJoCoParserClass():
             print ("")
             print ("dt:[%.3f] HZ:[%d]"%(self.dt,self.HZ))
             print ("body_names:\n %s"%(self.body_names))
-            print ("ee_name: [%s]"%(self.ee_name))
             print ("")
             print ("n_joint: [%d]"%(self.n_joint))
             print ("joint_names:\n %s"%(self.joint_names))
@@ -200,7 +198,7 @@ class MuJoCoParserClass():
         """
             Get body rotation
         """
-        R = np.array(self.sim.data.body_xmat[self.sim.model.body_name2id(self.ee_name)].reshape([3, 3]))
+        R = np.array(self.sim.data.body_xmat[self.sim.model.body_name2id(body_name)].reshape([3, 3]))
         return R
 
     def get_J_body(self,body_name):
@@ -268,13 +266,13 @@ class MuJoCoParserClass():
         self.forward(q_rev=q_rev)
         self.render(render_speedup=render_speedup,RENDER_ALWAYS=RENDER_ALWAYS)
 
-    def add_marker(self,pos,radius=0.02,color=np.array([0.0,1.0,0.0,1.0]),label=None):
+    def add_marker(self,pos,type=2,radius=0.02,color=np.array([0.0,1.0,0.0,1.0]),label=''):
         """
             Add a maker to renderer
         """
         self.viewer.add_marker(
             pos   = pos,
-            type  = 2, # mjtGeom: 2:sphere, 3:capsule, 6:box, 9:arrow
+            type  = type, # mjtGeom: 2:sphere, 3:capsule, 6:box, 9:arrow
             size  = radius*np.ones(3),
             rgba  = color,
             label = label)

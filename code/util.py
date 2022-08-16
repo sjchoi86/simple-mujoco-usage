@@ -1,5 +1,4 @@
-
-import time,torch
+import time,torch,math
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
@@ -36,6 +35,22 @@ def rpy2r(rpy):
     assert rot.shape == (3, 3)
     return rot
 
+def r2rpy(R,unit='rad'):
+    """
+        Rotation matrix to roll,pitch,yaw in radian
+    """
+    roll  = math.atan2(R[2, 1], R[2, 2])
+    pitch = math.atan2(-R[2, 0], (math.sqrt(R[2, 1] ** 2 + R[2, 2] ** 2)))
+    yaw   = math.atan2(R[1, 0], R[0, 0])
+    if unit == 'rad':
+        out = np.array([roll, pitch, yaw])
+    elif unit == 'deg':
+        out = np.array([roll, pitch, yaw])*180/np.pi
+    else:
+        out = None
+        raise Exception("[r2rpy] Unknown unit:[%s]"%(unit))
+    return out
+
 def r2w(R):
     """
         R to \omega
@@ -53,6 +68,27 @@ def r2w(R):
     else:
         w = np.math.pi/2 * np.array([[R[0,0]+1], [R[1,1]+1], [R[2,2]+1]])
     return w.flatten()
+
+def quaternion_to_euler_angle(w, x, y, z):
+    """
+        Quaternion to Euler angle in degree
+    """
+    y_sqr = y*y
+
+    t_0 = +2.0 * (w*x + y*z)
+    t_1 = +1.0 - 2.0 * (x*x + y_sqr)
+    X = math.degrees(math.atan2(t_0, t_1))
+	
+    t_2 = +2.0 * (w*y - z*x)
+    t_2 = +1.0 if t_2 > +1.0 else t_2
+    t_2 = -1.0 if t_2 < -1.0 else t_2
+    Y = math.degrees(math.asin(t_2))
+	
+    t_3 = +2.0 * (w*z + x*y)
+    t_4 = +1.0 - 2.0 * (y_sqr + z*z)
+    Z = math.degrees(math.atan2(t_3, t_4))
+	
+    return X, Y, Z
 
 class TicTocClass():
     def __init__(self,name='tictoc'):
@@ -77,6 +113,7 @@ class TicTocClass():
         self.t_elapsed = time.time() - self.t_init
         if VERBOSE:
             print ("[%s] [%.3f]sec elapsed."%(self.name,self.t_elapsed))
+        return self.t_elapsed
 
 def trim_scale(x,th):
     """
@@ -262,3 +299,188 @@ def np2torch(x_np,device='cpu'):
     else:
         x_torch = torch.tensor(x_np,dtype=torch.float32,device=device)
     return x_torch
+
+def plot_topdown_trajectory(
+    sec_list,
+    xyrad_list,
+    n_arrow           = 5,
+    arrow_blen        = 0.05,
+    arrow_flen        = 0.07,
+    arrow_width       = 0.05,
+    arrow_head_width  = 0.1,
+    arrow_head_length = 0.05,
+    arrow_alpha       = 0.3,
+    bbox_ec           = (0.0,0.0,0.0),
+    bbox_fc           = (1.0,0.9,0.8),
+    bbox_alpha        = 0.8,
+    cm                = plt.cm.rainbow_r,
+    figsize           = (10,5),
+    title_str         = 'Topdown trajectory'
+    ):
+    """
+        Plot top-down view of a snapbot torso trajectory
+    """
+    L = len(sec_list)
+    plt.figure(figsize=figsize)
+    plt.plot(xyrad_list[:,0],xyrad_list[:,1],'-',lw=2,color='k')
+    ticks   = np.linspace(0,L-1,n_arrow).astype(np.int16)
+    colors  = get_colors(n_arrow,cm=cm)
+    for t_idx,tick in enumerate(ticks):
+        sec   = sec_list[tick]
+        xyrad = xyrad_list[tick,:]
+        u,v   = np.cos(xyrad[2]),np.sin(xyrad[2])
+        color = colors[t_idx]
+        plt.arrow(x=xyrad[0]-arrow_blen*u,y=xyrad[1]-arrow_blen*v,dx=arrow_flen*u,dy=arrow_flen*v,
+                width=arrow_width,head_width=arrow_head_width,head_length=arrow_head_length,
+                color=color,alpha=arrow_alpha,ec='k',lw=1)
+        plt.text(x=xyrad[0],y=xyrad[1],s='%.2fs'%(sec),size=10,ha='center',va='center',
+                bbox=dict(boxstyle="round",ec=bbox_ec,fc=color,alpha=bbox_alpha),
+                rotation=xyrad[2]*180/np.pi)
+    plt.axis('equal')
+    plt.grid('on')
+    plt.xlabel('X [m]',fontsize=13); plt.ylabel('Y [m]',fontsize=13)
+    plt.title(title_str,fontsize=15)
+    plt.show()
+
+def plot_topdown_trajectory_and_joint_trajectory(
+    sec_list,
+    xyrad_list,
+    n_arrow           = 5,
+    arrow_blen        = 0.05,
+    arrow_flen        = 0.07,
+    arrow_width       = 0.05,
+    arrow_head_width  = 0.1,
+    arrow_head_length = 0.05,
+    arrow_alpha       = 0.3,
+    bbox_ec           = (0.0,0.0,0.0),
+    bbox_fc           = (1.0,0.9,0.8),
+    bbox_alpha        = 0.8,
+    cm                = plt.cm.rainbow_r,
+    figsize           = (10,5),
+    title_str         = 'Topdown trajectory',
+    traj_secs         = np.zeros((10,1)),
+    traj_joints       = np.zeros((10,8)),
+    t_anchor          = None,
+    x_anchor          = None,
+    fontsize          = 12
+    ):
+    """
+        Plot top-down view of a snapbot torso trajectory
+    """
+    L = len(sec_list)
+    fig = plt.figure(figsize=figsize)
+    fig.tight_layout()
+
+    plt.subplot(1,2,1)
+    plt.plot(xyrad_list[:,0],xyrad_list[:,1],'-',lw=2,color='k')
+    ticks   = np.linspace(0,L-1,n_arrow).astype(np.int16)
+    colors  = get_colors(n_arrow,cm=cm)
+    for t_idx,tick in enumerate(ticks):
+        sec   = sec_list[tick]
+        xyrad = xyrad_list[tick,:]
+        u,v   = np.cos(xyrad[2]),np.sin(xyrad[2])
+        color = colors[t_idx]
+        plt.arrow(x=xyrad[0]-arrow_blen*u,y=xyrad[1]-arrow_blen*v,dx=arrow_flen*u,dy=arrow_flen*v,
+                width=arrow_width,head_width=arrow_head_width,head_length=arrow_head_length,
+                color=color,alpha=arrow_alpha,ec='k',lw=1)
+        plt.text(x=xyrad[0],y=xyrad[1],s='%.2fs'%(sec),size=10,ha='center',va='center',
+                bbox=dict(boxstyle="round",ec=bbox_ec,fc=color,alpha=bbox_alpha),
+                rotation=xyrad[2]*180/np.pi)
+    plt.axis('equal')
+    plt.grid('on')
+    plt.xlabel('X [m]',fontsize=fontsize); plt.ylabel('Y [m]',fontsize=fontsize)
+    plt.title('Top-down trajectory',fontsize=fontsize)
+
+    plt.subplot(1,2,2)
+    colors = get_colors(traj_joints.shape[1])
+    for i_idx in range(traj_joints.shape[1]):
+        color = colors[i_idx]
+        plt.plot(traj_secs,traj_joints[:,i_idx],'-',color=color)
+    if (t_anchor is not None) and (x_anchor is not None):
+        for i_idx in range(x_anchor.shape[1]):
+            color = colors[i_idx]
+            plt.plot(t_anchor,x_anchor[:,i_idx],'o',color=color,ms=8,mfc='none',lw=1/2)
+    plt.xlabel('Time [s]',fontsize=fontsize); plt.ylabel('Joint position [rad]',fontsize=fontsize)
+    plt.title('Joint trajectory',fontsize=fontsize)
+
+    plt.suptitle(title_str,fontsize=fontsize)
+    plt.show()
+
+def get_anchors_from_traj(t_test,traj,n_anchor=20):
+    """
+    Get equidist anchors from a trajectory
+    """
+    n_test = len(t_test)
+    idxs = np.round(np.linspace(start=0,stop=n_test-1,num=n_anchor)).astype(np.int16)
+    t_anchor,x_anchor = t_test[idxs],traj[idxs]
+    return t_anchor,x_anchor
+
+class NormalizerClass(object):
+    def __init__(self,
+                 name    = 'NZR',
+                 x       = np.random.rand(100,4),
+                 eps     = 1e-6,
+                 axis    = 0,     # mean and std axis (0 or None)
+                 CHECK   = True,
+                 VERBOSE = False):
+        super(NormalizerClass,self).__init__()
+        self.name    = name
+        self.x       = x
+        self.eps     = eps
+        self.axis    = axis
+        self.CHECK   = CHECK
+        self.VERBOSE = VERBOSE
+        # Set data
+        self.set_data(x=self.x,eps=self.eps)
+        
+    def set_data(self,x=np.random.rand(100,4),eps=1e-6):
+        """
+            Set data
+        """
+        self.mean = np.mean(x,axis=self.axis)
+        self.std  = np.std(x,axis=self.axis)
+        if np.min(self.std) < 1e-4:
+            self.eps = 1.0 # numerical stability
+        # Check
+        if self.CHECK:
+            x_org        = self.x
+            x_nzd        = self.get_nzd_data(x_org=x_org)
+            x_org2       = self.get_org_data(x_nzd=x_nzd)
+            x_err        = x_org - x_org2
+            max_abs_err  = np.max(np.abs(x_err)) # maximum absolute error
+            mean_abs_err = np.mean(np.abs(x_err),axis=None) # mean absolute error
+            if self.VERBOSE:
+                print ("[NormalizerClass][%s] max_err:[%.3e] min_err:[%.3e]"%
+                    (self.name,max_abs_err,mean_abs_err))
+            
+    def get_nzd_data(self,x_org):
+        x_nzd = (x_org-self.mean)/(self.std + self.eps)
+        return x_nzd
+    
+    def get_org_data(self,x_nzd):
+        x_org = x_nzd*(self.std + self.eps) + self.mean
+        return x_org
+
+def whitening(x=np.random.rand(5,2)):
+    """
+        Whitening
+    """
+    if len(x.shape) == 1:
+        x_mean  = np.mean(x,axis=None)
+        x_std   = np.std(x,axis=None)
+    else:
+        x_mean  = np.mean(x,axis=0)
+        x_std   = np.std(x,axis=0)
+    return (x-x_mean)/x_std
+
+def whitening_torch(x=torch.rand(5,2)):
+    """
+        Whitening
+    """
+    if len(x.shape) == 1:
+        x_mean  = torch.mean(x)
+        x_std   = torch.std(x)
+    else:
+        x_mean  = torch.mean(x,axis=0)
+        x_std   = torch.std(x,axis=0)
+    return (x-x_mean)/x_std    

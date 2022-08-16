@@ -1,3 +1,4 @@
+from genericpath import samefile
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
@@ -161,7 +162,10 @@ class GaussianRandomPathClass(object):
             samples.append(sample)
         return samples,self.t_test
 
-    def sample_one_traj(self,rand_type='Gaussian',ORG_PERTURB=False,perturb_gain=1.0):
+    def sample_one_traj(
+        self,rand_type='Gaussian',ORG_PERTURB=False,perturb_gain=1.0,
+        ss_x_min=None,ss_x_max=None,ss_margin=None
+    ):
         """
             Sample a single trajectory
         """
@@ -178,7 +182,10 @@ class GaussianRandomPathClass(object):
             D = sample_traj.shape[1]
             pvec = 2.0*perturb_gain*np.random.rand(1,D)-perturb_gain
             sample_traj = sample_traj + np.tile(pvec,(L,1))
-
+        # (optional) soft-squash
+        if (ss_x_min is not None) and (ss_x_max is not None) and (ss_margin is not None):
+            sample_traj = soft_squash_multidim(
+                x=sample_traj,x_min=ss_x_min,x_max=ss_x_max,margin=ss_margin)
         return sample_traj,self.t_test
     
     def plot(self,
@@ -200,13 +207,14 @@ class GaussianRandomPathClass(object):
         sampled_trajs,t_test = self.sample(n_sample=n_sample,rand_type=rand_type)
         colors = [plt.cm.Set1(i) for i in range(self.d_anchor)]
         if subplot_rc is not None:
-            plt.figure(figsize=figsize)
+            fig = plt.figure(figsize=figsize)
         for d_idx in range(self.d_anchor):
             color = colors[d_idx]
             if subplot_rc is None:
                 plt.figure(figsize=figsize)
             else:
                 plt.subplot(subplot_rc[0],subplot_rc[1],d_idx+1)
+                fig.tight_layout()
             # Plot sampled trajectories
             for s_idx in range(len(sampled_trajs)):
                 sampled_traj = sampled_trajs[s_idx]
@@ -252,9 +260,14 @@ class GaussianRandomPathClass(object):
             Set GRP prior
         """
         # Eps-runup
-        t_anchor = np.array([[0.0,eps_sec,dur_sec-eps_sec,dur_sec]]).T
-        x_anchor = np.tile(q_init,reps=(4,1))
-        l_anchor = np.array([[1,1,1,1]]).T
+        if eps_sec == 0:
+            t_anchor = np.array([[0.0,dur_sec]]).T
+            x_anchor = np.tile(q_init,reps=(2,1))
+            l_anchor = np.array([[1,1]]).T
+        else:
+            t_anchor = np.array([[0.0,eps_sec,dur_sec-eps_sec,dur_sec]]).T
+            x_anchor = np.tile(q_init,reps=(4,1))
+            l_anchor = np.array([[1,1,1,1]]).T
         n_test   = int(dur_sec*HZ)
         t_test   = np.linspace(start=0.0,stop=dur_sec,num=n_test).reshape((-1,1))
         l_test   = np.ones((n_test,1))
@@ -278,3 +291,20 @@ class GaussianRandomPathClass(object):
         if (x_min is not None) and (x_max is not None):
             traj_test = soft_squash_multidim(x=traj_test,x_min=x_min,x_max=x_max,margin=margin)
         return traj_test
+
+    def lev_interpolate(
+        self,t_anchor,x_anchor,t_test,hyp={'g':1,'l':1/5,'w':1e-8},lev_val=0.9,
+        APPLY_EPSRU=False,t_eps=0.05,x_diff_start=None,x_diff_end=None,
+        x_min=None,x_max=None,margin=1.0):
+        """
+            Leveraged interpolation
+        """
+        n_anchor,n_test = t_anchor.shape[0],t_test.shape[0]
+        l_anchor,l_test = lev_val*np.ones(shape=(n_anchor,1)),np.ones(shape=(n_test,1))
+        self.set_data(
+            t_anchor=t_anchor,x_anchor=x_anchor,l_anchor=l_anchor,t_test=t_test,l_test=l_test,hyp_mean=hyp,hyp_var=hyp,
+            APPLY_EPSRU=APPLY_EPSRU,t_eps=t_eps,x_diff_start=x_diff_start,x_diff_end=x_diff_end,SKIP_GP_VAR=False)
+        traj_sample,_ = self.sample_one_traj(rand_type='Uniform')
+        if (x_min is not None) and (x_max is not None):
+            traj_sample = soft_squash_multidim(x=traj_sample,x_min=x_min,x_max=x_max,margin=margin)
+        return traj_sample
